@@ -9,16 +9,13 @@
   // asi funciona igual en floresamarillas.dyorch.com que en la URL .workers.dev.
   // Descomenta SITE_URL solo si necesitas forzar un dominio fijo.
   // "vars": { "SITE_URL": "https://floresamarillas.dyorch.com" },
-  // --------------------------------------------------------------------
-  // Base de datos D1. Crea una en el panel de Cloudflare
-  // (Storage & Databases -> D1 -> Create) con el nombre "flores-amarillas"
-  // y pega aqui abajo el Database ID que te muestra.
-  // --------------------------------------------------------------------
+  // Base de datos D1 de la cuenta. Las tablas se crean solas en el primer
+  // arranque, no hay migraciones que ejecutar a mano.
   "d1_databases": [
     {
       "binding": "DB",
       "database_name": "flores-amarillas",
-      "database_id": "PEGA_AQUI_TU_DATABASE_ID"
+      "database_id": "ba489e54-d3c0-486a-beef-939ce565fb84"
     }
   ]
 }
