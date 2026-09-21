@@ -1,0 +1,24 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "flores-amarillas",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-21",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true },
+  // Por defecto los links se arman con el dominio desde el que se abre el sitio,
+  // asi funciona igual en floresamarillas.dyorch.com que en la URL .workers.dev.
+  // Descomenta SITE_URL solo si necesitas forzar un dominio fijo.
+  // "vars": { "SITE_URL": "https://floresamarillas.dyorch.com" },
+  // --------------------------------------------------------------------
+  // Base de datos D1. Crea una en el panel de Cloudflare
+  // (Storage & Databases -> D1 -> Create) con el nombre "flores-amarillas"
+  // y pega aqui abajo el Database ID que te muestra.
+  // --------------------------------------------------------------------
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "flores-amarillas",
+      "database_id": "PEGA_AQUI_TU_DATABASE_ID"
+    }
+  ]
+}

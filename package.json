@@ -1,0 +1,21 @@
+{
+  "name": "flores-amarillas",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Flores amarillas personalizadas: crea un link unico con el nombre de una persona y regalale una pagina animada.",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "check": "tsc --noEmit && wrangler deploy --dry-run"
+  },
+  "dependencies": {
+    "hono": "^4.13.8",
+    "qrcode-svg": "^1.1.0",
+    "workers-og": "^0.0.27"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260921.1",
+    "typescript": "^5.7.3",
+    "wrangler": "^4.136.1"
+  }
+}
