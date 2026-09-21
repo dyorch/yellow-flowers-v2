@@ -33,14 +33,6 @@ export function makeRandom(seed: number): () => number {
   }
 }
 
-export function formatDate(timestamp: number): string {
-  return new Date(timestamp).toLocaleDateString('es-CO', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  })
-}
-
 export function htmlResponse(body: string, init: ResponseInit = {}): Response {
   return new Response(body, {
     ...init,

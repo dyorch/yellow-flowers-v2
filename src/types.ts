@@ -17,3 +17,11 @@ export interface Card {
   views: number
   last_view_at: number | null
 }
+
+export interface Visit {
+  opened_at: number
+  device: string | null
+  country: string | null
+  city: string | null
+  source: string | null
+}

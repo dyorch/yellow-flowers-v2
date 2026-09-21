@@ -4,11 +4,16 @@ Crea links personalizados que le regalan a una persona una página animada con f
 amarillas y su nombre. Pensado para `floresamarillas.dyorch.com`.
 
 - **`/`** — portada. No muestra ningún link: solo se llega a ellos con la dirección exacta.
-- **`/admin`** — panel privado para crear, editar, copiar y borrar links.
-- **`/nombre-de-la-persona`** — la página que recibe quien abre el link.
+- **`/admin`** — panel privado para crear, editar, copiar y borrar links, y ver sus métricas.
+- **`/k7Mx2q`** — la página que recibe quien abre el link.
 
-Todo corre en un Cloudflare Worker con una base D1. No hay servidores ni costos:
-entra de sobra en el plan gratuito.
+La dirección es un **código aleatorio de 6 caracteres**, no el nombre de la persona.
+Son más de 30.000 millones de combinaciones: nadie puede llegar a un link probando
+nombres. El código distingue mayúsculas de minúsculas.
+
+Todo está diseñado primero para celular, que es donde se abren estos links. Corre en
+un Cloudflare Worker con una base D1: no hay servidores ni costos, entra de sobra en
+el plan gratuito.
 
 ---
 
@@ -22,7 +27,7 @@ En el panel de Cloudflare:
 4. Abre `wrangler.jsonc` en este repositorio y reemplaza `PEGA_AQUI_TU_DATABASE_ID`
    por ese identificador. Guarda el cambio.
 
-> La tabla se crea sola la primera vez que alguien entra al sitio. No hay que
+> Las tablas se crean solas la primera vez que alguien entra al sitio. No hay que
 > ejecutar migraciones a mano.
 
 ## 2. Publicar el Worker desde GitHub
@@ -62,12 +67,33 @@ en el Worker: **Settings → Variables and Secrets → Add**, tipo *Secret*:
 
 1. Entra a `floresamarillas.dyorch.com/admin` y escribe tu usuario y clave.
 2. Escribe el nombre de la persona y dale **Crear flores**.
-3. Se genera una dirección con ese nombre: `María José` → `/maria-jose`.
-   Si ya existe, se le agrega un sufijo corto (`/maria-jose-k4p`).
+3. Se genera una dirección con un código al azar, por ejemplo `/k7Mx2q`. El nombre
+   queda guardado aparte y solo se ve dentro de la página.
 4. Copia el link, o muestra el **QR** si quieres imprimirlo o mostrarlo en pantalla.
 
 Al pegar el link en WhatsApp aparece una vista previa con el nombre de la persona
-sobre un campo de flores. Esa imagen se genera al vuelo en `/og/<slug>.png`.
+sobre un campo de flores. Esa imagen se genera al vuelo en `/og/<codigo>.png`.
+
+## Métricas
+
+Cada link tiene su página de **Métricas** en el panel, con:
+
+- Cuántas veces se abrió en total, y cuándo fue la última.
+- Gráfica de los últimos 14 días y otra de a qué hora del día la abren.
+- Desde qué aparato (celular, tablet, computador), desde dónde (país y ciudad
+  aproximados que entrega Cloudflare) y de dónde llegaron.
+- El historial de las últimas aperturas, una por una, con fecha y hora.
+
+Las horas se muestran en **hora de Colombia (UTC-5)**; para cambiarlo, edita `TZ`
+en `src/views/panel.ts`.
+
+Dos advertencias sobre cómo leer estos números:
+
+- Los previsualizadores de enlaces (el robot de WhatsApp, Telegram, etc.) están
+  filtrados y no cuentan como aperturas.
+- Cuando alguien abre el link desde una app, el navegador casi nunca informa el
+  origen. Por eso la mayoría de las aperturas reales aparecen como **directas**,
+  aunque hayan venido de WhatsApp.
 
 ## Qué ve la persona
 
@@ -98,14 +124,17 @@ clave sigue siendo `admin` / `admin123`.
 
 ```
 src/
-  index.ts          rutas (público, panel, QR, imagen de WhatsApp)
-  db.ts             consultas a D1 y creación automática de la tabla
+  index.ts          rutas (público, panel, métricas, QR, imagen de WhatsApp)
+  db.ts             consultas a D1 y creación automática de las tablas
   auth.ts           sesión del panel con cookie firmada (HMAC)
-  slug.ts           nombre → dirección, y palabras reservadas
+  slug.ts           generación del código aleatorio y palabras reservadas
+  visitor.ts        aparato, ubicación y origen de cada apertura
   og.ts             imagen 1200×630 para la vista previa de WhatsApp
   views/
     card.ts         la página que recibe la persona
     flowers.ts      el jardín animado en SVG
+    panel.ts        estilos del panel (móvil primero) y formato de fechas
     admin.ts        login y panel
+    metrics.ts      página de métricas de un link
     home.ts         portada, error 404 y ayuda de instalación
 ```

@@ -1,9 +1,11 @@
 const SHELL_STYLES = `
 *{box-sizing:border-box}
-html,body{height:100%}
+html,body{min-height:100%}
 body{margin:0;display:flex;align-items:center;justify-content:center;padding:32px 22px;text-align:center;
   font-family:'Quicksand',system-ui,-apple-system,sans-serif;color:#4A2E05;
-  background:radial-gradient(120% 85% at 50% 4%,#FFF9D9 0%,#FFEDAE 30%,#FFD87A 66%,#FFC352 100%);
+  background-color:#FFC352;
+  background-image:radial-gradient(120% 85% at 50% 4%,#FFF9D9 0%,#FFEDAE 30%,#FFD87A 66%,#FFC352 100%);
+  background-repeat:no-repeat;background-size:100% 100dvh;
   -webkit-font-smoothing:antialiased}
 .wrap{max-width:520px}
 h1{font-family:'Playfair Display',serif;font-weight:900;margin:0 0 14px;

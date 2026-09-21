@@ -8,9 +8,10 @@ import {
   listCards,
   getCard,
   createCard,
-  updateCard,
+  renameCard,
   deleteCard,
-  registerView,
+  recordVisit,
+  listVisits,
 } from './db'
 import {
   SESSION_COOKIE,
@@ -18,9 +19,11 @@ import {
   createSessionToken,
   verifySessionToken,
 } from './auth'
-import { slugify, isReserved, randomSuffix, cleanName } from './slug'
+import { makeCode, isReserved, cleanName } from './slug'
+import { readVisitContext } from './visitor'
 import { cardPage } from './views/card'
 import { adminPage, loginPage } from './views/admin'
+import { metricsPage } from './views/metrics'
 import { homePage, notFoundPage, setupPage } from './views/home'
 import { htmlResponse } from './views/shared'
 import { ogImage } from './og'
@@ -30,12 +33,11 @@ const app = new Hono<{ Bindings: Env }>()
 /** Mensajes de estado del panel. Se pasan por codigo para no inyectar texto libre en la URL. */
 const FLASHES: Record<string, { kind: 'ok' | 'error'; message: string }> = {
   creada: { kind: 'ok', message: 'Listo, el link ya funciona. Copialo y compartelo.' },
-  actualizada: { kind: 'ok', message: 'Cambios guardados.' },
+  actualizada: { kind: 'ok', message: 'Nombre actualizado.' },
   borrada: { kind: 'ok', message: 'Link borrado. Ya no abre para nadie.' },
   'error-nombre': { kind: 'error', message: 'Escribe un nombre para poder crear el link.' },
-  'error-duplicado': { kind: 'error', message: 'Esa direccion ya esta ocupada por otro link.' },
-  'error-reservado': { kind: 'error', message: 'Esa direccion esta reservada por el sistema. Usa otra.' },
   'error-no-encontrada': { kind: 'error', message: 'No encontramos ese link.' },
+  'error-codigo': { kind: 'error', message: 'No se pudo generar un codigo libre. Intentalo otra vez.' },
 }
 
 /** URL publica desde la que se sirvio la peticion; SITE_URL solo la sobreescribe si esta definida. */
@@ -49,7 +51,7 @@ function isSecureRequest(requestUrl: string): boolean {
   return new URL(requestUrl).protocol === 'https:'
 }
 
-/** Los previsualizadores de enlaces no deben contar como visitas reales. */
+/** Los previsualizadores de enlaces no deben contar como aperturas reales. */
 function looksLikeBot(userAgent: string | undefined): boolean {
   if (!userAgent) return true
   return /bot|crawler|spider|preview|whatsapp|facebookexternalhit|telegram|twitter|slack|discord|embed|curl|wget|headless/i.test(
@@ -57,8 +59,8 @@ function looksLikeBot(userAgent: string | undefined): boolean {
   )
 }
 
-// La tabla se crea sola la primera vez que se usa la base. Si el Worker todavia
-// no tiene D1 conectada, se explica que falta en lugar de devolver un error 500.
+// Las tablas se crean solas la primera vez que se usa la base. Si el Worker
+// todavia no tiene D1 conectada, se explica que falta en lugar de dar error 500.
 app.use('*', async (c, next) => {
   if (!c.env.DB) return htmlResponse(setupPage(), { status: 503 })
   await ensureSchema(c.env.DB)
@@ -91,12 +93,12 @@ app.get('/admin', async (c) => {
     return htmlResponse(loginPage({}))
   }
   const cards = await listCards(c.env.DB)
-  const flashKey = c.req.query('m') ?? ''
   return htmlResponse(
     adminPage({
       cards,
       siteUrl: siteUrl(c.req.url, c.env),
-      flash: FLASHES[flashKey],
+      flash: FLASHES[c.req.query('m') ?? ''],
+      justCreated: c.req.query('n') ?? undefined,
     }),
   )
 })
@@ -130,33 +132,31 @@ app.post('/admin/create', async (c) => {
   const name = cleanName(String(body.name ?? ''))
   if (!name) return c.redirect('/admin?m=error-nombre', 302)
 
-  const base = slugify(name) || 'flores'
-  let slug = isReserved(base) ? `${base}-${randomSuffix()}` : base
-
-  // Si el slug ya existe se le agrega un sufijo corto hasta encontrar uno libre.
-  for (let attempt = 0; attempt < 8 && (await getCard(c.env.DB, slug)); attempt++) {
-    slug = `${base}-${randomSuffix(attempt < 4 ? 3 : 5)}`
+  // El codigo es aleatorio, no se deriva del nombre. Se reintenta si cae en
+  // uno ya usado o en una palabra reservada por la aplicacion.
+  let code = ''
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const candidate = makeCode()
+    if (isReserved(candidate)) continue
+    if (await getCard(c.env.DB, candidate)) continue
+    code = candidate
+    break
   }
-  if (await getCard(c.env.DB, slug)) return c.redirect('/admin?m=error-duplicado', 302)
+  if (!code) return c.redirect('/admin?m=error-codigo', 302)
 
-  await createCard(c.env.DB, slug, name)
-  return c.redirect('/admin?m=creada', 302)
+  await createCard(c.env.DB, code, name)
+  return c.redirect(`/admin?m=creada&n=${encodeURIComponent(code)}`, 302)
 })
 
 app.post('/admin/update', async (c) => {
   const body = await c.req.parseBody()
   const slug = String(body.slug ?? '')
   const name = cleanName(String(body.name ?? ''))
-  const newSlug = slugify(String(body.newSlug ?? ''))
 
-  if (!name || !newSlug) return c.redirect('/admin?m=error-nombre', 302)
-  if (isReserved(newSlug)) return c.redirect('/admin?m=error-reservado', 302)
+  if (!name) return c.redirect('/admin?m=error-nombre', 302)
   if (!(await getCard(c.env.DB, slug))) return c.redirect('/admin?m=error-no-encontrada', 302)
-  if (newSlug !== slug && (await getCard(c.env.DB, newSlug))) {
-    return c.redirect('/admin?m=error-duplicado', 302)
-  }
 
-  await updateCard(c.env.DB, slug, { slug: newSlug, name })
+  await renameCard(c.env.DB, slug, name)
   return c.redirect('/admin?m=actualizada', 302)
 })
 
@@ -165,6 +165,13 @@ app.post('/admin/delete', async (c) => {
   const slug = String(body.slug ?? '')
   if (slug) await deleteCard(c.env.DB, slug)
   return c.redirect('/admin?m=borrada', 302)
+})
+
+app.get('/admin/m/:slug', async (c) => {
+  const card = await getCard(c.env.DB, c.req.param('slug'))
+  if (!card) return c.redirect('/admin?m=error-no-encontrada', 302)
+  const visits = await listVisits(c.env.DB, card.slug)
+  return htmlResponse(metricsPage({ card, visits, siteUrl: siteUrl(c.req.url, c.env) }))
 })
 
 app.get('/admin/qr/:file', async (c) => {
@@ -205,9 +212,9 @@ app.get('/:slug', async (c) => {
   const card = await getCard(c.env.DB, slug)
   if (!card) return htmlResponse(notFoundPage(), { status: 404 })
 
-  // El contador se actualiza despues de responder, para no demorar la pagina.
+  // La apertura se registra despues de responder, para no demorar la pagina.
   if (!looksLikeBot(c.req.header('user-agent'))) {
-    c.executionCtx.waitUntil(registerView(c.env.DB, slug))
+    c.executionCtx.waitUntil(recordVisit(c.env.DB, slug, readVisitContext(c.req.raw)))
   }
 
   return htmlResponse(cardPage({ name: card.name, slug: card.slug, siteUrl: siteUrl(c.req.url, c.env) }))
